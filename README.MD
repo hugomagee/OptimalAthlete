@@ -120,7 +120,7 @@ The dashboard will open automatically in your browser at `http://localhost:8501`
 
 ## Academic Context
 
-This project was developed as part of my application to ISEG's MSc in Data Analytics for Business. It demonstrates:
+This project was developed as part of my application for MSc in Buisness Analytics / Data Science. It demonstrates:
 - End-to-end ML pipeline development
 - Database design and management
 - Statistical modeling and feature engineering
@@ -132,7 +132,7 @@ This project was developed as part of my application to ISEG's MSc in Data Analy
 **Author**
 - Final-year Science student, University College Dublin
 - Elite 400m sprinter competing for Ireland (Season Best: <47s)
-- Target: MSc Data Analytics / Business analytics  (2025)
+- Target: MSc Data Analytics / Business analytics  (2026)
 
 ## Future Enhancements
 
@@ -153,3 +153,4 @@ This project is for academic and personal use.
 ---
 
 **Built with by an athlete, for athletes**
+
