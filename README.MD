@@ -14,7 +14,7 @@ OptimalAthlete analyzes training data, recovery metrics, and race performance to
 
 Elite 400m sprinters, coaches, and sports scientists seeking data-driven performance insights.
 
-##  Key Features
+## Key Features
 
 ### 1. Data Management
 - SQLite database storing athlete profiles, training sessions, performance metrics, and race results
@@ -43,30 +43,30 @@ Elite 400m sprinters, coaches, and sports scientists seeking data-driven perform
 - **Plotly**: Interactive visualizations
 - **SQLite**: Lightweight database
 
-##  Project Structure
+## Project Structure
 ```
 OptimalAthlete/
 │
-├── data/                          # Database and datasets
-│   └── optimalathlete.db         # SQLite database
+├── data/ # Database and datasets
+│ └── optimalathlete.db # SQLite database
 │
-├── src/                           # Source code
-│   ├── database.py               # Database connection management
-│   ├── data_loader.py            # Synthetic data generation
-│   ├── feature_engineering.py    # Feature creation for ML
-│   ├── models.py                 # ML model training
-│   └── dashboard.py              # Streamlit dashboard
+├── src/ # Source code
+│ ├── database.py # Database connection management
+│ ├── data_loader.py # Synthetic data generation
+│ ├── feature_engineering.py # Feature creation for ML
+│ ├── models.py # ML model training
+│ └── dashboard.py # Streamlit dashboard
 │
-├── notebooks/                     # Jupyter notebooks
-│   └── exploratory_analysis.ipynb
+├── notebooks/ # Jupyter notebooks
+│ └── exploratory_analysis.ipynb
 │
-├── docs/                          # Documentation
-│   ├── figures/                  # Charts and visualizations
-│   └── project_report.md         # Detailed project report
+├── docs/ # Documentation
+│ ├── figures/ # Charts and visualizations
+│ └── project_report.md # Detailed project report
 │
-├── setup_db.py                    # Database schema definition
-├── requirements.txt               # Python dependencies
-└── README.md                      # This file
+├── setup_db.py # Database schema definition
+├── requirements.txt # Python dependencies
+└── README.md # This file
 ```
 
 ## Quick Start Guide
@@ -129,10 +129,10 @@ This project was developed as part of my application to ISEG's MSc in Data Analy
 
 ## Author
 
-**Hugo Magee**
+**Author**
 - Final-year Science student, University College Dublin
-- Elite 400m sprinter competing for Ireland (PB: 46.9s)
-- Target: MSc Data Analytics / Business analytics at ISEG (2025)
+- Elite 400m sprinter competing for Ireland (Season Best: <47s)
+- Target: MSc Data Analytics / Business analytics  (2025)
 
 ## Future Enhancements
 
@@ -144,7 +144,7 @@ This project was developed as part of my application to ISEG's MSc in Data Analy
 
 ## Contact
 
-For questions or collaboration: [Hugo.magee1@ucdconnect.ie]
+For questions or collaboration: [Hugo.Magee1@ucdconnect.ie]
 
 ## License
 
