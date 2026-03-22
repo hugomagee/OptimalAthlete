@@ -1,13 +1,13 @@
 # OptimalAthlete - ML Sprint Performance System
 
-An intelligent sprint performance analysis system using machine learning to predict 400m race times and optimize training recommendations for elite athletes.
+An intelligent sprint performance analysis system using machine learning to predict 400m race times and optimize training recommendations for elite athletes — achieving R²=0.84 on 18 months of personal race and training data.
 
 ## Project Overview
 
 OptimalAthlete analyzes training data, recovery metrics, and race performance to provide:
 - **Performance Prediction**: ML models predict race times based on training history
 - **Training Optimization**: Personalized recommendations to improve performance
-- **Recovery Monitoring**: Track wellness metrics and prevent overtraining
+- **Recovery Monitoring**: Track wellness metrics and prevent overtraning
 - **Interactive Dashboard**: Real-time visualization of athlete data
 
 ## Target Users
@@ -142,7 +142,7 @@ Target: MSc Data Analytics programs
 
 ## Contact
 
-For questions or collaboration: [your.email@university.ie]
+For questions or collaboration: hugo.magee1@ucdconnect.ie | [LinkedIn](https://www.linkedin.com/in/hugo-magee/)
 
 ## License
 
