@@ -9,8 +9,11 @@ from sqlalchemy.pool import StaticPool
 import os
 
 # Database configuration
-DATABASE_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'optimalathlete.db')
+DATABASE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'optimalathlete.db')
 DATABASE_URL = f'sqlite:///{DATABASE_PATH}'
+
+# Ensure the data directory exists before SQLite tries to create the file
+os.makedirs(os.path.dirname(DATABASE_PATH), exist_ok=True)
 
 # Create engine with appropriate settings for SQLite
 engine = create_engine(
