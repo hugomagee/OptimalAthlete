@@ -1,5 +1,7 @@
 # OptimalAthlete - ML Sprint Performance System
 
+[![CI](https://github.com/hugomagee/OptimalAthlete/actions/workflows/ci.yml/badge.svg)](https://github.com/hugomagee/OptimalAthlete/actions/workflows/ci.yml)
+
 An intelligent sprint performance analysis system using machine learning to predict 400m race times and optimize training recommendations for elite athletes — achieving R²=0.84 on 18 months of personal race and training data.
 
 ## Project Overview
