@@ -6,21 +6,84 @@ Interactive interface for data visualization and predictions.
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
 import pickle
+import json
 import os
-from datetime import datetime, timedelta
 from database import get_db
 from setup_db import Athlete, TrainingSession, PerformanceMetric, RaceResult
-from feature_engineering import engineer_features
 
 
 # Page configuration
 st.set_page_config(
     page_title="OptimalAthlete Dashboard",
-    page_icon="",
+    page_icon=None,
     layout="wide"
 )
+
+# Custom CSS
+st.markdown("""
+<style>
+    /* Main background and font */
+    .main { background-color: #0e1117; }
+
+    /* Header styling */
+    h1 { color: #f0f2f6; font-weight: 700; letter-spacing: -0.5px; }
+    h2, h3 { color: #c9d1d9; }
+
+    /* Metric cards */
+    [data-testid="metric-container"] {
+        background: linear-gradient(135deg, #1c1f26, #252930);
+        border: 1px solid #2d3139;
+        border-radius: 12px;
+        padding: 16px 20px;
+    }
+    [data-testid="metric-container"] label {
+        color: #8b949e !important;
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+    }
+    [data-testid="metric-container"] [data-testid="metric-value"] {
+        color: #58a6ff !important;
+        font-size: 1.8rem;
+        font-weight: 700;
+    }
+
+    /* Tab styling */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        border-bottom: 1px solid #30363d;
+    }
+    .stTabs [data-baseweb="tab"] {
+        background: transparent;
+        border: 1px solid #30363d;
+        border-radius: 8px 8px 0 0;
+        color: #8b949e;
+        padding: 8px 20px;
+        font-weight: 500;
+    }
+    .stTabs [aria-selected="true"] {
+        background: #1c1f26 !important;
+        border-color: #58a6ff !important;
+        color: #58a6ff !important;
+    }
+
+    /* Sidebar */
+    [data-testid="stSidebar"] {
+        background: #161b22;
+        border-right: 1px solid #30363d;
+    }
+
+    /* Dataframe */
+    [data-testid="stDataFrame"] { border-radius: 10px; overflow: hidden; }
+
+    /* Divider */
+    hr { border-color: #30363d; }
+
+    /* Footer */
+    .footer-text { color: #8b949e; font-size: 0.82rem; text-align: center; }
+</style>
+""", unsafe_allow_html=True)
 
 
 @st.cache_data
@@ -90,19 +153,38 @@ def load_models():
         return None, None, None
 
 
+@st.cache_data
+def load_model_metrics():
+    """Load evaluation metrics saved at training time, if available."""
+    try:
+        with open('models/model_metrics.json') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return None
+
+
 def main():
     """Main dashboard function."""
     
     # Header
-    st.title("OptimalAthlete Performance Dashboard")
-    st.markdown("### ML-Powered Sprint Performance Analysis")
+    st.markdown("""
+    <div style="display:flex; align-items:center; gap:14px; margin-bottom:6px;">
+        <div>
+            <h1 style="margin:0; padding:0; font-size:2rem;">OptimalAthlete</h1>
+            <p style="margin:0; color:#8b949e; font-size:0.95rem; letter-spacing:0.04em;">
+                ML-POWERED SPRINT PERFORMANCE ANALYSIS
+            </p>
+        </div>
+    </div>
+    <hr style="margin-top:8px; margin-bottom:20px;">
+    """, unsafe_allow_html=True)
     
     # Load data
     athletes_df, sessions_df, metrics_df, races_df = load_data()
     rf_model, xgb_model, feature_names = load_models()
     
     # Sidebar - Athlete Selection
-    st.sidebar.header("Dashboard Controls")
+    st.sidebar.markdown("## Dashboard Controls")
     selected_athlete_id = st.sidebar.selectbox(
         "Select Athlete",
         athletes_df['id'].tolist(),
@@ -179,8 +261,17 @@ def main():
             x='date',
             y='duration',
             title='Weekly Training Volume (minutes)',
-            labels={'duration': 'Minutes', 'date': 'Date'}
+            labels={'duration': 'Minutes', 'date': 'Date'},
+            color_discrete_sequence=['#58a6ff'],
+            template='plotly_dark'
         )
+        fig_volume.update_layout(
+            plot_bgcolor='#1c1f26',
+            paper_bgcolor='#1c1f26',
+            font_color='#c9d1d9',
+            title_font_size=15,
+        )
+        fig_volume.update_traces(line_width=2.5)
         st.plotly_chart(fig_volume, use_container_width=True)
     
     # TAB 2: Training Analysis
@@ -195,7 +286,15 @@ def main():
             fig_pie = px.pie(
                 values=session_counts.values,
                 names=session_counts.index,
-                title='Training Session Distribution'
+                title='Training Session Distribution',
+                color_discrete_sequence=['#58a6ff', '#3fb950', '#f78166', '#d2a8ff', '#ffa657'],
+                template='plotly_dark'
+            )
+            fig_pie.update_layout(
+                plot_bgcolor='#1c1f26',
+                paper_bgcolor='#1c1f26',
+                font_color='#c9d1d9',
+                title_font_size=15,
             )
             st.plotly_chart(fig_pie, use_container_width=True)
         
@@ -206,7 +305,16 @@ def main():
                 x='intensity',
                 nbins=10,
                 title='Training Intensity Distribution',
-                labels={'intensity': 'RPE Score (1-10)'}
+                labels={'intensity': 'RPE Score (1-10)'},
+                color_discrete_sequence=['#3fb950'],
+                template='plotly_dark'
+            )
+            fig_intensity.update_layout(
+                plot_bgcolor='#1c1f26',
+                paper_bgcolor='#1c1f26',
+                font_color='#c9d1d9',
+                title_font_size=15,
+                bargap=0.1,
             )
             st.plotly_chart(fig_intensity, use_container_width=True)
         
@@ -234,13 +342,27 @@ def main():
                 y='time',
                 title='Race Performance Over Time',
                 labels={'time': '400m Time (seconds)', 'date': 'Date'},
-                markers=True
+                markers=True,
+                color_discrete_sequence=['#58a6ff'],
+                template='plotly_dark'
+            )
+            fig_races.update_traces(
+                line_width=2.5,
+                marker=dict(size=8, symbol='circle', line=dict(width=2, color='#1c1f26'))
             )
             fig_races.add_hline(
                 y=athlete_info['pb_400m'],
                 line_dash="dash",
-                line_color="red",
-                annotation_text="Personal Best"
+                line_color="#f78166",
+                annotation_text="Personal Best",
+                annotation_font_color="#f78166"
+            )
+            fig_races.update_layout(
+                plot_bgcolor='#1c1f26',
+                paper_bgcolor='#1c1f26',
+                font_color='#c9d1d9',
+                title_font_size=15,
+                yaxis=dict(autorange='reversed'),
             )
             st.plotly_chart(fig_races, use_container_width=True)
             
@@ -260,20 +382,29 @@ def main():
         
         if rf_model is not None:
             st.subheader("Model Performance")
-            
+
+            metrics = load_model_metrics()
             col1, col2 = st.columns(2)
-            
+
             with col1:
                 st.markdown("**Random Forest Model**")
-                st.write("- Test MAE: ~0.3 seconds")
-                st.write("- Best performing model")
-                st.write("- Uses 12 training features")
-            
+                if metrics:
+                    rf = metrics['random_forest']
+                    st.write(f"- Test MAE: {rf['test_mae']:.2f} seconds")
+                    st.write(f"- Test R²: {rf['test_r2']:.2f}")
+                else:
+                    st.write("- Metrics unavailable (retrain with `python models.py`)")
+                st.write(f"- Uses {len(feature_names)} training features")
+
             with col2:
                 st.markdown("**XGBoost Model**")
-                st.write("- Test MAE: ~0.3 seconds")
+                if metrics:
+                    xg = metrics['xgboost']
+                    st.write(f"- Test MAE: {xg['test_mae']:.2f} seconds")
+                    st.write(f"- Test R²: {xg['test_r2']:.2f}")
+                else:
+                    st.write("- Metrics unavailable (retrain with `python models.py`)")
                 st.write("- Gradient boosting approach")
-                st.write("- Emphasis on sleep quality")
             
             st.markdown("---")
             st.subheader("Race Time Prediction")
@@ -295,7 +426,15 @@ def main():
                 x='Importance',
                 y='Feature',
                 orientation='h',
-                title='Top 5 Features for Prediction'
+                title='Top 5 Features for Prediction',
+                color_discrete_sequence=['#d2a8ff'],
+                template='plotly_dark'
+            )
+            fig_importance.update_layout(
+                plot_bgcolor='#1c1f26',
+                paper_bgcolor='#1c1f26',
+                font_color='#c9d1d9',
+                title_font_size=15,
             )
             st.plotly_chart(fig_importance, use_container_width=True)
             
@@ -305,8 +444,10 @@ def main():
     # Footer
     st.markdown("---")
     st.markdown(
-        "**OptimalAthlete** - ML Sprint Performance System | "
-        "Built for MSc Data Analytics Application"
+        '<p class="footer-text"><strong>OptimalAthlete</strong> &nbsp;·&nbsp; '
+        'ML Sprint Performance System &nbsp;·&nbsp; '
+        'Built for MSc Data Analytics Application</p>',
+        unsafe_allow_html=True
     )
 
 
