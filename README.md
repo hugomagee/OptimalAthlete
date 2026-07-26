@@ -6,6 +6,25 @@
 
 An intelligent sprint performance analysis system using machine learning to predict 400m race times and optimize training recommendations for elite athletes. An earlier version of this README claimed R²=0.84 on personal training data; a full statistical re-audit (see [Analysis](#analysis)) found that figure was an artifact of athlete-identity and temporal leakage, and it has been retracted — see [Model Performance](#model-performance) for what the models actually achieve under honest validation.
 
+## Analysis
+
+**"Was recovery quality really more predictive of 400m performance than training volume?"**
+— answered rigorously in
+[`analysis/recovery_vs_volume.ipynb`](analysis/recovery_vs_volume.ipynb)
+([rendered on nbviewer](https://nbviewer.org/github/hugomagee/OptimalAthlete/blob/main/analysis/recovery_vs_volume.ipynb)),
+with the methodology defended in [docs/ANALYSIS_NOTES.md](docs/ANALYSIS_NOTES.md).
+
+> **Verified finding:** on the data available, neither recovery quality nor training volume
+> showed out-of-sample predictive signal (importance difference −0.04 s, 95% CI −0.08 to
+> +0.05, n=7 races) — and a provenance audit revealed the recovery/volume variables in the
+> database are synthetic, so the earlier "2.3× more predictive" claim is retracted as
+> unverifiable.
+
+![Recovery vs volume permutation importance with bootstrap confidence intervals](analysis/figures/recovery_vs_volume_importance.png)
+
+The notebook runs end-to-end on synthetic data in CI (`USE_SYNTHETIC=1`), so the analysis
+can never silently rot.
+
 ## Screenshots
 
 | Overview | Training Analysis | ML Predictions |
