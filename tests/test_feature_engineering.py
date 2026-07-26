@@ -3,9 +3,8 @@
 import numpy as np
 import pandas as pd
 
-from feature_engineering import create_training_features, create_race_dataset
+from feature_engineering import create_race_dataset, create_training_features
 from models import prepare_ml_data
-
 
 EXPECTED_FEATURES = [
     'avg_intensity_7d', 'avg_intensity_14d', 'avg_duration_7d',

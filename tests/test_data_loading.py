@@ -3,7 +3,7 @@
 import pandas as pd
 
 from data_loader import generate_synthetic_data
-from setup_db import Athlete, TrainingSession, PerformanceMetric, RaceResult
+from setup_db import Athlete, PerformanceMetric, RaceResult, TrainingSession
 
 
 class TestGenerateSyntheticData:

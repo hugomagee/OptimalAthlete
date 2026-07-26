@@ -3,10 +3,11 @@ Add real 2025 race data to the database.
 Replaces synthetic data with actual race results.
 """
 
-from database import get_db
-from setup_db import Athlete, TrainingSession, PerformanceMetric, RaceResult
-from datetime import datetime, timedelta
 import random
+from datetime import datetime, timedelta
+
+from database import get_db
+from setup_db import Athlete, PerformanceMetric, RaceResult, TrainingSession
 
 
 def clear_existing_data():
@@ -28,7 +29,7 @@ def clear_existing_data():
 def add_real_races():
     """Add real 2025 race results."""
     db = get_db()
-    
+
     # Real race data
     races = [
         ("2025-04-12", 47.68, "Marsa Athletics Track, Malta", "Good"),
@@ -40,11 +41,11 @@ def add_real_races():
         ("2025-08-02", 47.44, "Morton Stadium, Santry, Dublin", "Good"),
         ("2025-08-03", 47.85, "Morton Stadium, Santry, Dublin", "Good"),
     ]
-    
+
     try:
         for date_str, time_sec, location, conditions in races:
             race = RaceResult(
-                athlete_id=1, 
+                athlete_id=1,
                 date=datetime.strptime(date_str, "%Y-%m-%d").date(),
                 event="400m",
                 time_seconds=time_sec,
@@ -53,12 +54,12 @@ def add_real_races():
                 conditions=conditions
             )
             db.add(race)
-        
+
         db.commit()
         print(f"Added {len(races)} real race results")
-        print(f"   Season Best: 46.95s (May 10, Belfast)")
-        print(f"   Latest Race: 47.85s (Aug 3)")
-    
+        print("   Season Best: 46.95s (May 10, Belfast)")
+        print("   Latest Race: 47.85s (Aug 3)")
+
     finally:
         db.close()
 
@@ -66,29 +67,29 @@ def add_real_races():
 def generate_training_data():
     """Generate realistic training data between races."""
     db = get_db()
-    
+
     try:
         # Training period: February to August 2025
         start_date = datetime(2025, 2, 1)
         end_date = datetime(2025, 8, 3)
-        
+
         current_date = start_date
         session_count = 0
         metric_count = 0
-        
+
         # Training types and typical patterns
         training_types = ["Speed Endurance", "Tempo", "Speed", "Strength", "Recovery"]
-        
+
         # Baseline metrics
         base_hrv = 65
         base_rhr = 48
         base_sleep = 7.5
-        
+
         while current_date <= end_date:
             # Train 5-6 days per week
             if random.random() < 0.83:
                 training_type = random.choice(training_types)
-                
+
                 # Session intensity by type
                 intensity_map = {
                     "Speed": random.uniform(8.5, 10.0),
@@ -97,7 +98,7 @@ def generate_training_data():
                     "Strength": random.uniform(7.0, 8.5),
                     "Recovery": random.uniform(3.0, 5.5)
                 }
-                
+
                 session = TrainingSession(
                     athlete_id=1,
                     date=current_date.date(),
@@ -108,13 +109,13 @@ def generate_training_data():
                 )
                 db.add(session)
                 db.flush()
-                
+
                 session_count += 1
-                
+
                 # Add performance metrics (90% of sessions)
                 if random.random() < 0.9:
                     fatigue_factor = random.uniform(0.9, 1.1)
-                    
+
                     metric = PerformanceMetric(
                         session_id=session.id,
                         hrv_score=int(base_hrv * fatigue_factor),
@@ -127,13 +128,13 @@ def generate_training_data():
                     )
                     db.add(metric)
                     metric_count += 1
-            
+
             current_date += timedelta(days=1)
-        
+
         db.commit()
         print(f"Generated {session_count} training sessions")
         print(f"Generated {metric_count} performance metrics")
-    
+
     finally:
         db.close()
 
@@ -141,7 +142,7 @@ def generate_training_data():
 def update_athlete_info():
     """Update athlete profile with information."""
     db = get_db()
-    
+
     try:
         athlete = db.query(Athlete).filter(Athlete.id == 1).first()
         if athlete:
@@ -152,31 +153,31 @@ def update_athlete_info():
             athlete.gender = "Male"
             athlete.weight_kg = 75
             athlete.height_cm = 180
-            
+
             db.commit()
             print("Updated athlete profile")
-            print(f"   Personal Best: 46.95s")
-    
+            print("   Personal Best: 46.95s")
+
     finally:
         db.close()
 
 
 if __name__ == "__main__":
     print("Adding real 2025 race data...\n")
-    
+
     # Step 1: Clear old synthetic data
     clear_existing_data()
-    
+
     # Step 2: Update athlete info
     update_athlete_info()
-    
+
     # Step 3: Add real race results
     add_real_races()
-    
+
     # Step 4: Generate realistic training data
     print("\nGenerating training data (Feb-Aug 2025)...")
     generate_training_data()
-    
+
     print("\n" + "="*60)
     print("REAL DATA ADDED SUCCESSFULLY!")
     print("="*60)

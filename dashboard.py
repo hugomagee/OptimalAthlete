@@ -3,15 +3,15 @@ Streamlit dashboard for OptimalAthlete sprint performance system.
 Interactive interface for data visualization and predictions.
 """
 
-import streamlit as st
+import json
+import pickle
+
 import pandas as pd
 import plotly.express as px
-import pickle
-import json
-import os
-from database import get_db
-from setup_db import Athlete, TrainingSession, PerformanceMetric, RaceResult
+import streamlit as st
 
+from database import get_db
+from setup_db import Athlete, PerformanceMetric, RaceResult, TrainingSession
 
 # Page configuration
 st.set_page_config(
@@ -90,7 +90,7 @@ st.markdown("""
 def load_data():
     """Load all data from database."""
     db = get_db()
-    
+
     try:
         # Load athletes
         athletes = db.query(Athlete).all()
@@ -100,7 +100,7 @@ def load_data():
             'gender': a.gender,
             'pb_400m': a.personal_best_400m
         } for a in athletes])
-        
+
         # Load training sessions
         sessions = db.query(TrainingSession).all()
         sessions_df = pd.DataFrame([{
@@ -110,7 +110,7 @@ def load_data():
             'duration': s.duration_minutes,
             'intensity': s.intensity_rpe
         } for s in sessions])
-        
+
         # Load metrics
         metrics = db.query(PerformanceMetric).all()
         metrics_df = pd.DataFrame([{
@@ -121,7 +121,7 @@ def load_data():
             'fatigue': m.fatigue_level,
             'wellness': m.wellness_score
         } for m in metrics])
-        
+
         # Load races
         races = db.query(RaceResult).all()
         races_df = pd.DataFrame([{
@@ -130,9 +130,9 @@ def load_data():
             'time': r.time_seconds,
             'location': r.location
         } for r in races])
-        
+
         return athletes_df, sessions_df, metrics_df, races_df
-    
+
     finally:
         db.close()
 
@@ -165,7 +165,7 @@ def load_model_metrics():
 
 def main():
     """Main dashboard function."""
-    
+
     # Header
     st.markdown("""
     <div style="display:flex; align-items:center; gap:14px; margin-bottom:6px;">
@@ -178,11 +178,11 @@ def main():
     </div>
     <hr style="margin-top:8px; margin-bottom:20px;">
     """, unsafe_allow_html=True)
-    
+
     # Load data
     athletes_df, sessions_df, metrics_df, races_df = load_data()
     rf_model, xgb_model, feature_names = load_models()
-    
+
     # Sidebar - Athlete Selection
     st.sidebar.markdown("## Dashboard Controls")
     selected_athlete_id = st.sidebar.selectbox(
@@ -190,48 +190,48 @@ def main():
         athletes_df['id'].tolist(),
         format_func=lambda x: athletes_df[athletes_df['id']==x]['name'].values[0]
     )
-    
+
     athlete_info = athletes_df[athletes_df['id']==selected_athlete_id].iloc[0]
-    
+
     # Sidebar - Athlete Info
     st.sidebar.markdown("---")
     st.sidebar.markdown("### Athlete Profile")
     st.sidebar.write(f"**Name:** {athlete_info['name']}")
     st.sidebar.write(f"**Gender:** {athlete_info['gender']}")
     st.sidebar.write(f"**400m PB:** {athlete_info['pb_400m']:.2f}s")
-    
+
     # Filter data for selected athlete
     athlete_sessions = sessions_df[sessions_df['athlete_id']==selected_athlete_id].copy()
     athlete_races = races_df[races_df['athlete_id']==selected_athlete_id].copy()
-    
+
     # Main content tabs
     tab1, tab2, tab3, tab4 = st.tabs([
-        "Overview", 
-        "Training Analysis", 
+        "Overview",
+        "Training Analysis",
         "Race Results",
         "ML Predictions"
     ])
-    
+
     # TAB 1: Overview
     with tab1:
         st.header("Performance Overview")
-        
+
         col1, col2, col3, col4 = st.columns(4)
-        
+
         with col1:
             st.metric(
                 "Total Sessions",
                 len(athlete_sessions),
                 delta=None
             )
-        
+
         with col2:
             st.metric(
                 "Total Races",
                 len(athlete_races),
                 delta=None
             )
-        
+
         with col3:
             avg_intensity = athlete_sessions['intensity'].mean()
             st.metric(
@@ -239,7 +239,7 @@ def main():
                 f"{avg_intensity:.1f}/10",
                 delta=None
             )
-        
+
         with col4:
             if len(athlete_races) > 0:
                 best_time = athlete_races['time'].min()
@@ -248,14 +248,14 @@ def main():
                     f"{best_time:.2f}s",
                     delta=None
                 )
-        
+
         # Training volume over time
         st.subheader("Training Volume Over Time")
         athlete_sessions['date'] = pd.to_datetime(athlete_sessions['date'])
         weekly_volume = athlete_sessions.groupby(
             pd.Grouper(key='date', freq='W')
         )['duration'].sum().reset_index()
-        
+
         fig_volume = px.line(
             weekly_volume,
             x='date',
@@ -273,13 +273,13 @@ def main():
         )
         fig_volume.update_traces(line_width=2.5)
         st.plotly_chart(fig_volume, use_container_width=True)
-    
+
     # TAB 2: Training Analysis
     with tab2:
         st.header("Training Analysis")
-        
+
         col1, col2 = st.columns(2)
-        
+
         with col1:
             # Session type distribution
             session_counts = athlete_sessions['session_type'].value_counts()
@@ -297,7 +297,7 @@ def main():
                 title_font_size=15,
             )
             st.plotly_chart(fig_pie, use_container_width=True)
-        
+
         with col2:
             # Intensity distribution
             fig_intensity = px.histogram(
@@ -317,7 +317,7 @@ def main():
                 bargap=0.1,
             )
             st.plotly_chart(fig_intensity, use_container_width=True)
-        
+
         # Recent sessions table
         st.subheader("Recent Training Sessions")
         recent_sessions = athlete_sessions.sort_values('date', ascending=False).head(10)
@@ -326,15 +326,15 @@ def main():
             use_container_width=True,
             hide_index=True
         )
-    
+
     # TAB 3: Race Results
     with tab3:
         st.header("Race Performance")
-        
+
         if len(athlete_races) > 0:
             athlete_races['date'] = pd.to_datetime(athlete_races['date'])
             athlete_races_sorted = athlete_races.sort_values('date')
-            
+
             # Race times over time
             fig_races = px.line(
                 athlete_races_sorted,
@@ -365,7 +365,7 @@ def main():
                 yaxis=dict(autorange='reversed'),
             )
             st.plotly_chart(fig_races, use_container_width=True)
-            
+
             # Race results table
             st.subheader("All Race Results")
             st.dataframe(
@@ -375,11 +375,11 @@ def main():
             )
         else:
             st.info("No race results available for this athlete.")
-    
+
     # TAB 4: ML Predictions
     with tab4:
         st.header("Machine Learning Predictions")
-        
+
         if rf_model is not None:
             st.subheader("Model Performance")
 
@@ -405,7 +405,7 @@ def main():
                 else:
                     st.write("- Metrics unavailable (retrain with `python models.py`)")
                 st.write("- Gradient boosting approach")
-            
+
             st.markdown("---")
             st.subheader("Race Time Prediction")
             st.info(
@@ -413,14 +413,14 @@ def main():
                 "With limited race samples in demo dataset, predictions are approximate. "
                 "A real system with 100+ races would be more accurate."
             )
-            
+
             # Feature importance
             st.subheader("Most Important Features")
             feature_importance = pd.DataFrame({
                 'Feature': feature_names,
                 'Importance': rf_model.feature_importances_
             }).sort_values('Importance', ascending=False).head(5)
-            
+
             fig_importance = px.bar(
                 feature_importance,
                 x='Importance',
@@ -437,10 +437,10 @@ def main():
                 title_font_size=15,
             )
             st.plotly_chart(fig_importance, use_container_width=True)
-            
+
         else:
             st.error("Models not loaded. Please train models first by running: `python models.py`")
-    
+
     # Footer
     st.markdown("---")
     st.markdown(

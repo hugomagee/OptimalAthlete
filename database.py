@@ -3,13 +3,16 @@ Database connection and session management for OptimalAthlete.
 Provides SQLAlchemy engine and session management.
 """
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, scoped_session
-from sqlalchemy.pool import StaticPool
 import os
 
+from sqlalchemy import create_engine
+from sqlalchemy.orm import scoped_session, sessionmaker
+from sqlalchemy.pool import StaticPool
+
 # Database configuration
-DATABASE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', 'optimalathlete.db')
+DATABASE_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), 'data', 'optimalathlete.db'
+)
 DATABASE_URL = f'sqlite:///{DATABASE_PATH}'
 
 # Ensure the data directory exists before SQLite tries to create the file
@@ -33,14 +36,14 @@ Session = scoped_session(SessionLocal)
 def get_db():
     """
     Get database session.
-    
+
     Usage:
         db = get_db()
         try:
             result = db.query(Athlete).all()
         finally:
             db.close()
-    
+
     Returns:
         SQLAlchemy session object
     """
@@ -74,7 +77,7 @@ def close_db():
 if __name__ == "__main__":
     print("Testing database connection...")
     init_database()
-    
+
     db = get_db()
     print("Database connection successful!")
     db.close()

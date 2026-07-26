@@ -3,10 +3,11 @@ Database schema for OptimalAthlete sprint performance system.
 Defines tables for athletes, training sessions, performance metrics, and race results.
 """
 
-from sqlalchemy import create_engine, Column, Integer, Float, String, Date, Text
-from sqlalchemy.orm import declarative_base
-from datetime import datetime
 import os
+from datetime import datetime
+
+from sqlalchemy import Column, Date, Float, Integer, String, Text, create_engine
+from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
 
@@ -14,7 +15,7 @@ Base = declarative_base()
 class Athlete(Base):
     """Athlete profile and basic information"""
     __tablename__ = 'athletes'
-    
+
     id = Column(Integer, primary_key=True)
     first_name = Column(String(50), nullable=False)
     last_name = Column(String(50), nullable=False)
@@ -29,7 +30,7 @@ class Athlete(Base):
 class TrainingSession(Base):
     """Individual training session data"""
     __tablename__ = 'training_sessions'
-    
+
     id = Column(Integer, primary_key=True)
     athlete_id = Column(Integer, nullable=False)
     date = Column(Date, nullable=False)
@@ -42,7 +43,7 @@ class TrainingSession(Base):
 class PerformanceMetric(Base):
     """Daily performance and recovery metrics"""
     __tablename__ = 'performance_metrics'
-    
+
     id = Column(Integer, primary_key=True)
     session_id = Column(Integer, nullable=False)
     hrv_score = Column(Integer)
@@ -57,7 +58,7 @@ class PerformanceMetric(Base):
 class RaceResult(Base):
     """Competition race results"""
     __tablename__ = 'race_results'
-    
+
     id = Column(Integer, primary_key=True)
     athlete_id = Column(Integer, nullable=False)
     date = Column(Date, nullable=False)
@@ -72,7 +73,7 @@ if __name__ == '__main__':
     os.makedirs('data', exist_ok=True)
     engine = create_engine('sqlite:///data/optimalathlete.db')
     Base.metadata.create_all(engine)
-    
+
     print("Database initialized at: data/optimalathlete.db")
     print("All tables created successfully!")
     print("   - athletes")

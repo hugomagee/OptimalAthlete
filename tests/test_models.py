@@ -7,12 +7,10 @@ import pandas as pd
 import pytest
 
 from models import (
-    prepare_ml_data,
+    save_models,
     train_random_forest,
     train_xgboost,
-    save_models,
 )
-
 
 METRIC_KEYS = {
     'model_name', 'train_mae', 'test_mae',
