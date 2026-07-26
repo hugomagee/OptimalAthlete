@@ -24,3 +24,12 @@ jobs:
 
       - name: Run tests
         run: pytest
+
+      - name: Execute analysis notebook on synthetic data
+        env:
+          USE_SYNTHETIC: "1"
+        run: |
+          jupyter nbconvert --to notebook --execute \
+            analysis/recovery_vs_volume.ipynb \
+            --output /tmp/recovery_vs_volume_synthetic.ipynb \
+            --ExecutePreprocessor.timeout=600
