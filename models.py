@@ -10,6 +10,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 import xgboost as xgb
 import pickle
+import json
 import os
 from feature_engineering import engineer_features
 
@@ -170,35 +171,42 @@ def display_feature_importance(model, feature_names, model_name):
         print(feature_importance_df.to_string(index=False))
 
 
-def save_models(rf_model, xgb_model, feature_names):
+def save_models(rf_model, xgb_model, feature_names, metrics=None):
     """
     Save trained models to disk.
-    
+
     Args:
         rf_model: Trained Random Forest model
         xgb_model: Trained XGBoost model
         feature_names: List of feature names
+        metrics: Optional dict of evaluation metrics to save alongside models
     """
     # TODO: Add model versioning and metadata tracking
     # Create models directory if it doesn't exist
     os.makedirs('models', exist_ok=True)
-    
+
     # Save Random Forest
     with open('models/random_forest_model.pkl', 'wb') as f:
         pickle.dump(rf_model, f)
-    
+
     # Save XGBoost
     with open('models/xgboost_model.pkl', 'wb') as f:
         pickle.dump(xgb_model, f)
-    
+
     # Save feature names
     with open('models/feature_names.pkl', 'wb') as f:
         pickle.dump(feature_names, f)
-    
+
+    # Save evaluation metrics so the dashboard reports real numbers
+    if metrics is not None:
+        with open('models/model_metrics.json', 'w') as f:
+            json.dump(metrics, f, indent=2)
+
     print("\nModels saved to 'models/' directory:")
     print("   - random_forest_model.pkl")
     print("   - xgboost_model.pkl")
     print("   - feature_names.pkl")
+    print("   - model_metrics.json")
 
 
 def train_models():
@@ -233,7 +241,10 @@ def train_models():
     display_feature_importance(xgb_model, feature_names, "XGBoost")
     
     # Save models
-    save_models(rf_model, xgb_model, feature_names)
+    save_models(
+        rf_model, xgb_model, feature_names,
+        metrics={'random_forest': rf_metrics, 'xgboost': xgb_metrics}
+    )
     
     # Summary
     print("\n" + "="*60)
