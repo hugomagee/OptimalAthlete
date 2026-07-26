@@ -4,7 +4,7 @@
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-An intelligent sprint performance analysis system using machine learning to predict 400m race times and optimize training recommendations for elite athletes — achieving R²=0.84 on 18 months of personal race and training data (private dataset, not included in this repo; see [Model Performance](#model-performance)).
+An intelligent sprint performance analysis system using machine learning to predict 400m race times and optimize training recommendations for elite athletes. An earlier version of this README claimed R²=0.84 on personal training data; a full statistical re-audit (see [Analysis](#analysis)) found that figure was an artifact of athlete-identity and temporal leakage, and it has been retracted — see [Model Performance](#model-performance) for what the models actually achieve under honest validation.
 
 ## Screenshots
 
@@ -127,18 +127,21 @@ bootstraps its own data and models on first run. See
 
 ## Model Performance
 
-- **Private training data** (18 months of personal race and training history,
-  not included in this repo): R²=0.84 as reported above. This figure cannot be
-  reproduced from the repo alone.
+**The honest numbers** (from the [analysis notebook](analysis/recovery_vs_volume.ipynb),
+which re-audited every headline claim on the private database):
+
+- **"R²=0.84" — retracted.** Under the original protocol (athletes pooled, random
+  train/test split) the number is driven by leakage: 95.6% of pooled outcome variance
+  is *between* athletes, a baseline that only knows which athlete is racing scores
+  R²≈0.91 with no form information at all, and the protocol itself now yields only
+  R²≈0.64 on the available data.
+- **Honest validation** (single athlete, walk-forward, no future leakage): out-of-sample
+  MAE ≈ 0.74 s (95% CI 0.41–1.08) and negative R² on n=4 out-of-sample races — the model
+  does not yet beat a "predict my recent average" baseline.
 - **Bundled synthetic demo data** (what a fresh clone trains on): results vary
-  substantially between runs because the demo data is randomly generated and
-  contains only ~20 race samples — observed Random Forest test MAE ranges from
-  about 0.7 s to 1.7 s, with XGBoost typically weaker. Treat the demo purely
-  as a pipeline demonstration, not a benchmark. Metrics from the latest
-  training run are saved to `models/model_metrics.json` and shown live in the
-  dashboard's ML Predictions tab.
-- **Feature Importance**: Training intensity, recovery metrics, recent
-  performance trends
+  substantially between runs; treat the demo purely as a pipeline demonstration, not a
+  benchmark. Metrics from the latest training run are saved to
+  `models/model_metrics.json` and shown live in the dashboard's ML Predictions tab.
 
 ## Academic Context
 
