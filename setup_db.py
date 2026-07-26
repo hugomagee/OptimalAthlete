@@ -4,8 +4,7 @@ Defines tables for athletes, training sessions, performance metrics, and race re
 """
 
 from sqlalchemy import create_engine, Column, Integer, Float, String, Date, Text
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import declarative_base
 from datetime import datetime
 import os
 
