@@ -1,18 +1,18 @@
 # Core Data Science
-pandas>=2.2.0
-numpy>=1.26.0
-scikit-learn>=1.4.0
+pandas==3.0.5
+numpy==2.5.1
+scikit-learn==1.9.0
 
 # Machine Learning
-xgboost>=2.0.0
+xgboost==3.3.0
 
 # Database
-sqlalchemy>=2.0.0
+sqlalchemy==2.0.51
 
 # Dashboard and Visualization
-streamlit>=1.30.0
-plotly>=5.18.0
+streamlit==1.60.0
+plotly==6.9.0
 
 # Utilities
-python-dateutil>=2.8.2
-pytz>=2023.3
+python-dateutil==2.9.0.post0
+pytz==2026.3.post1
