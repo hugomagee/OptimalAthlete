@@ -4,6 +4,7 @@ Interactive interface for data visualization and predictions.
 """
 
 import json
+import os
 import pickle
 
 import pandas as pd
@@ -84,6 +85,29 @@ st.markdown("""
     .footer-text { color: #8b949e; font-size: 0.82rem; text-align: center; }
 </style>
 """, unsafe_allow_html=True)
+
+
+@st.cache_resource
+def ensure_data_and_models():
+    """Bootstrap the database and models on first run (e.g. Streamlit Cloud).
+
+    Creates the SQLite schema, generates synthetic demo data if the database
+    is empty, and trains models if no saved models exist yet.
+    """
+    from database import init_database
+    init_database()
+
+    db = get_db()
+    try:
+        if db.query(Athlete).count() == 0:
+            from data_loader import generate_synthetic_data
+            generate_synthetic_data(db, num_athletes=5, days_of_data=180)
+    finally:
+        db.close()
+
+    if not os.path.exists('models/random_forest_model.pkl'):
+        from models import train_models
+        train_models()
 
 
 @st.cache_data
@@ -179,7 +203,8 @@ def main():
     <hr style="margin-top:8px; margin-bottom:20px;">
     """, unsafe_allow_html=True)
 
-    # Load data
+    # Bootstrap database and models on first run, then load data
+    ensure_data_and_models()
     athletes_df, sessions_df, metrics_df, races_df = load_data()
     rf_model, xgb_model, feature_names = load_models()
 
