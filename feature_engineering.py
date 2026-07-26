@@ -10,7 +10,7 @@ from database import get_db
 from setup_db import Athlete, PerformanceMetric, RaceResult, TrainingSession
 
 
-def load_data_from_db():
+def load_data_from_db() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     Load all data from database into pandas DataFrames.
 
@@ -74,7 +74,11 @@ def load_data_from_db():
         db.close()
 
 
-def create_training_features(sessions_df, metrics_df, lookback_days=14):
+def create_training_features(
+    sessions_df: pd.DataFrame,
+    metrics_df: pd.DataFrame,
+    lookback_days: int = 14,
+) -> pd.DataFrame:
     """
     Create rolling features from training sessions.
 
@@ -138,7 +142,7 @@ def create_training_features(sessions_df, metrics_df, lookback_days=14):
     return features_df
 
 
-def create_race_dataset(races_df, features_df):
+def create_race_dataset(races_df: pd.DataFrame, features_df: pd.DataFrame) -> pd.DataFrame:
     """
     Create ML dataset by matching race dates with training features.
 
@@ -190,7 +194,7 @@ def create_race_dataset(races_df, features_df):
     return ml_df
 
 
-def engineer_features():
+def engineer_features() -> pd.DataFrame:
     """
     Main function to run complete feature engineering pipeline.
 

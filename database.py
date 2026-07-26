@@ -33,7 +33,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Session = scoped_session(SessionLocal)
 
 
-def get_db():
+def get_db() -> 'Session':
     """
     Get database session.
 
@@ -55,7 +55,7 @@ def get_db():
         raise e
 
 
-def init_database():
+def init_database() -> None:
     """
     Initialize database by creating all tables.
     This imports Base from setup_db and creates tables.
@@ -65,7 +65,7 @@ def init_database():
     print(f"Database initialized at: {DATABASE_PATH}")
 
 
-def close_db():
+def close_db() -> None:
     """
     Close all database sessions.
     Call this when shutting down the application.

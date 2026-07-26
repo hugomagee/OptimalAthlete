@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from setup_db import Athlete, PerformanceMetric, RaceResult, TrainingSession
 
 
-def generate_synthetic_data(db: Session, num_athletes: int = 5, days_of_data: int = 180):
+def generate_synthetic_data(db: Session, num_athletes: int = 5, days_of_data: int = 180) -> None:
     """
     Generate synthetic training data for sprint athletes.
 

@@ -17,7 +17,7 @@ from sklearn.model_selection import train_test_split
 from feature_engineering import engineer_features
 
 
-def prepare_ml_data(ml_dataset):
+def prepare_ml_data(ml_dataset: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, list[str]]:
     """
     Prepare features and target for ML training.
 
@@ -41,7 +41,12 @@ def prepare_ml_data(ml_dataset):
     return X, y, feature_cols
 
 
-def train_random_forest(X_train, y_train, X_test, y_test):
+def train_random_forest(
+    X_train: pd.DataFrame,
+    y_train: pd.Series,
+    X_test: pd.DataFrame,
+    y_test: pd.Series,
+) -> tuple[RandomForestRegressor, dict]:
     """
     Train Random Forest Regressor.
 
@@ -97,7 +102,12 @@ def train_random_forest(X_train, y_train, X_test, y_test):
     return rf_model, metrics
 
 
-def train_xgboost(X_train, y_train, X_test, y_test):
+def train_xgboost(
+    X_train: pd.DataFrame,
+    y_train: pd.Series,
+    X_test: pd.DataFrame,
+    y_test: pd.Series,
+) -> tuple[xgb.XGBRegressor, dict]:
     """
     Train XGBoost Regressor.
 
@@ -152,7 +162,7 @@ def train_xgboost(X_train, y_train, X_test, y_test):
     return xgb_model, metrics
 
 
-def display_feature_importance(model, feature_names, model_name):
+def display_feature_importance(model, feature_names: list[str], model_name: str) -> None:
     """
     Display feature importance from trained model.
 
@@ -173,7 +183,12 @@ def display_feature_importance(model, feature_names, model_name):
         print(feature_importance_df.to_string(index=False))
 
 
-def save_models(rf_model, xgb_model, feature_names, metrics=None):
+def save_models(
+    rf_model: RandomForestRegressor,
+    xgb_model: xgb.XGBRegressor,
+    feature_names: list[str],
+    metrics: dict | None = None,
+) -> None:
     """
     Save trained models to disk.
 
@@ -211,7 +226,7 @@ def save_models(rf_model, xgb_model, feature_names, metrics=None):
     print("   - model_metrics.json")
 
 
-def train_models():
+def train_models() -> tuple[RandomForestRegressor, xgb.XGBRegressor, dict, dict]:
     """
     Main function to train all ML models.
     """
