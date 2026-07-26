@@ -130,13 +130,13 @@ bootstraps its own data and models on first run. See
 - **Private training data** (18 months of personal race and training history,
   not included in this repo): R²=0.84 as reported above. This figure cannot be
   reproduced from the repo alone.
-- **Bundled synthetic demo data** (what a fresh clone trains on): Random Forest
-  achieves roughly MAE 0.6–0.7 s and R² ≈ 0.8 on the held-out test split;
-  XGBoost is typically weaker on this small demo set. Exact numbers vary
-  between runs because the demo data is randomly generated (only ~20 race
-  samples). Metrics from the latest training run are saved to
-  `models/model_metrics.json` and shown live in the dashboard's ML Predictions
-  tab.
+- **Bundled synthetic demo data** (what a fresh clone trains on): results vary
+  substantially between runs because the demo data is randomly generated and
+  contains only ~20 race samples — observed Random Forest test MAE ranges from
+  about 0.7 s to 1.7 s, with XGBoost typically weaker. Treat the demo purely
+  as a pipeline demonstration, not a benchmark. Metrics from the latest
+  training run are saved to `models/model_metrics.json` and shown live in the
+  dashboard's ML Predictions tab.
 - **Feature Importance**: Training intensity, recovery metrics, recent
   performance trends
 
