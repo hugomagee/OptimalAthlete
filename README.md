@@ -4,6 +4,12 @@
 
 An intelligent sprint performance analysis system using machine learning to predict 400m race times and optimize training recommendations for elite athletes — achieving R²=0.84 on 18 months of personal race and training data.
 
+## Screenshots
+
+| Overview | Training Analysis | ML Predictions |
+| --- | --- | --- |
+| ![Overview tab showing performance metrics and weekly training volume](docs/screenshots/overview.png) | ![Training Analysis tab showing session distribution and intensity](docs/screenshots/training-analysis.png) | ![ML Predictions tab showing model performance and feature importance](docs/screenshots/ml-predictions.png) |
+
 ## Project Overview
 
 OptimalAthlete analyzes training data, recovery metrics, and race performance to provide:
