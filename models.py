@@ -381,7 +381,7 @@ def train_models() -> tuple[RandomForestRegressor, xgb.XGBRegressor, dict, dict]
     walk_forward = evaluate_walk_forward(ml_dataset, feature_names)
 
     if walk_forward:
-        for key, m in walk_forward.items():
+        for m in walk_forward.values():
             r2 = f"{m['r2']:.3f}" if m['r2'] is not None else "n/a"
             print(f"   {m['model_name']:<34} MAE {m['mae']:.3f}s  "
                   f"RMSE {m['rmse']:.3f}s  R² {r2}  (n={m['n_predictions']})")
