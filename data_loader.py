@@ -1,6 +1,22 @@
 """
 Synthetic data generator for OptimalAthlete sprint performance system.
-Generates realistic training session data for 400m sprinters.
+
+IMPORTANT — what this data does and does not contain.
+
+Race times here are generated as ``personal_best + uniform(-0.3, 1.5)``: they
+depend on **the athlete's identity and nothing else**. There is deliberately no
+relationship between any training or recovery feature and the race outcome.
+
+That makes this dataset a test of the *evaluation protocol* rather than of the
+models. The correct result on data with no signal is that a model fails to beat
+a "predict this athlete's recent average" baseline. Walk-forward validation
+recovers exactly that. The naive pooled random split, by contrast, reports a
+positive R² — which is pure leakage, since the only real structure in the data
+is athlete identity and a pooled split lets the model see each athlete on both
+sides. See ``models.py`` and the README's Model Performance section.
+
+Generation is seeded and dates are anchored to a fixed reference date, so a
+fresh clone reproduces the same database and therefore the same metrics.
 """
 
 import random
@@ -10,16 +26,31 @@ from sqlalchemy.orm import Session
 
 from setup_db import Athlete, PerformanceMetric, RaceResult, TrainingSession
 
+# Fixed anchor so generated dates — and every downstream metric — are
+# reproducible. Previously this used datetime.now(), which meant a fresh clone
+# produced a different database and different numbers on every run.
+REFERENCE_DATE = datetime(2025, 6, 30)
+DEFAULT_SEED = 42
 
-def generate_synthetic_data(db: Session, num_athletes: int = 5, days_of_data: int = 180) -> None:
+
+def generate_synthetic_data(
+    db: Session,
+    num_athletes: int = 5,
+    days_of_data: int = 540,
+    seed: int = DEFAULT_SEED,
+    reference_date: datetime = REFERENCE_DATE,
+) -> None:
     """
     Generate synthetic training data for sprint athletes.
 
     Args:
         db: SQLAlchemy database session
         num_athletes: Number of athletes to generate (default 5)
-        days_of_data: Number of days of historical data (default 180)
+        days_of_data: Number of days of historical data (default 540)
+        seed: RNG seed — fixed so the generated database is reproducible
+        reference_date: end date of the generated window (fixed, not "today")
     """
+    random.seed(seed)
     print(f"Generating synthetic data for {num_athletes} athletes over {days_of_data} days...")
 
     # Clear existing data
@@ -59,7 +90,7 @@ def generate_synthetic_data(db: Session, num_athletes: int = 5, days_of_data: in
     print(f"Created {num_athletes} athletes")
 
     # Generate training sessions for each athlete
-    start_date = datetime.now() - timedelta(days=days_of_data)
+    start_date = reference_date - timedelta(days=days_of_data)
     training_types = ["Speed Endurance", "Tempo", "Speed", "Strength", "Recovery", "Race Pace"]
 
     session_count = 0
@@ -74,7 +105,7 @@ def generate_synthetic_data(db: Session, num_athletes: int = 5, days_of_data: in
         base_rhr = random.randint(45, 60)
         base_sleep = random.uniform(7.0, 8.5)
 
-        while current_date <= datetime.now():
+        while current_date <= reference_date:
             # Training happens 5-6 days per week
             if random.random() < 0.8:
                 training_type = random.choice(training_types)
@@ -120,7 +151,7 @@ def generate_synthetic_data(db: Session, num_athletes: int = 5, days_of_data: in
                     metric_count += 1
 
                 # Add race results (approximately every 2-3 weeks during season)
-                if training_type == "Race Pace" and random.random() < 0.15:
+                if training_type == "Race Pace" and random.random() < 0.45:
                     time_result = athlete.personal_best_400m + random.uniform(-0.3, 1.5)
 
                     race = RaceResult(
@@ -154,6 +185,6 @@ if __name__ == "__main__":
     # Generate data
     db = get_db()
     try:
-        generate_synthetic_data(db, num_athletes=5, days_of_data=180)
+        generate_synthetic_data(db, num_athletes=5, days_of_data=540)
     finally:
         db.close()

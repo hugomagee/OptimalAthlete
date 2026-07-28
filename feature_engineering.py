@@ -77,64 +77,71 @@ def load_data_from_db() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.Da
 def create_training_features(
     sessions_df: pd.DataFrame,
     metrics_df: pd.DataFrame,
-    lookback_days: int = 14,
+    short_window: str = '7D',
+    long_window: str = '14D',
 ) -> pd.DataFrame:
     """
-    Create rolling features from training sessions.
+    Create rolling features from training sessions using genuine time windows.
+
+    The windows are calendar-based ('7D' = the trailing seven days, inclusive of
+    the current session), not row-based. This distinction matters: an athlete
+    who trains twice a week and one who trains daily have very different
+    seven-day loads, but a seven-ROW window would treat them identically while
+    still being labelled "7d".
+
+    A bug fixed in this function: these features previously used
+    ``rolling(window=7)``, which counts sessions rather than days, so
+    ``sessions_past_7d`` was structurally incapable of varying (it counted rows
+    in a 7-row window, i.e. min(7, sessions so far)) and every ``*_7d`` name was
+    inaccurate. See the changelog note in the README.
 
     Args:
         sessions_df: DataFrame of training sessions
         metrics_df: DataFrame of performance metrics
-        lookback_days: Number of days to look back for rolling features
+        short_window: pandas offset alias for the short lookback (default '7D')
+        long_window: pandas offset alias for the long lookback (default '14D')
 
     Returns:
-        DataFrame with engineered features
+        DataFrame with engineered features, one row per session
     """
     # Merge sessions with metrics
     df = sessions_df.merge(metrics_df, on='session_id', how='left')
     df['date'] = pd.to_datetime(df['date'])
     df = df.sort_values(['athlete_id', 'date'])
 
-    # Create features for each athlete
+    # Derived per-session quantities the rolling windows aggregate
+    df['training_load'] = df['intensity_rpe'] * df['duration_minutes']
+    df['recovery_score'] = (10 - df['fatigue_level']) * df['sleep_hours'] / 8
+
     features_list = []
 
-    def roll7(series):
-        return series.rolling(window=7, min_periods=1)
+    for _, athlete_df in df.groupby('athlete_id', sort=False):
+        # Time-based rolling requires a sorted DatetimeIndex.
+        athlete_df = athlete_df.sort_values('date').set_index('date')
+        short = athlete_df.rolling(short_window)
+        long = athlete_df.rolling(long_window)
 
-    def roll14(series):
-        return series.rolling(window=14, min_periods=1)
+        # Trailing 7-day averages
+        athlete_df['avg_intensity_7d'] = short['intensity_rpe'].mean()
+        athlete_df['avg_duration_7d'] = short['duration_minutes'].mean()
+        athlete_df['avg_hrv_7d'] = short['hrv_score'].mean()
+        athlete_df['avg_sleep_7d'] = short['sleep_hours'].mean()
+        athlete_df['avg_fatigue_7d'] = short['fatigue_level'].mean()
+        athlete_df['avg_recovery_7d'] = short['recovery_score'].mean()
 
-    for athlete_id in df['athlete_id'].unique():
-        athlete_df = df[df['athlete_id'] == athlete_id].copy()
-        athlete_df = athlete_df.sort_values('date')
+        # Trailing 14-day averages
+        athlete_df['avg_intensity_14d'] = long['intensity_rpe'].mean()
+        athlete_df['avg_wellness_14d'] = long['wellness_score'].mean()
 
-        # Rolling averages (past 7 days)
-        athlete_df['avg_intensity_7d'] = roll7(athlete_df['intensity_rpe']).mean()
-        athlete_df['avg_duration_7d'] = roll7(athlete_df['duration_minutes']).mean()
-        athlete_df['avg_hrv_7d'] = roll7(athlete_df['hrv_score']).mean()
-        athlete_df['avg_sleep_7d'] = roll7(athlete_df['sleep_hours']).mean()
-        athlete_df['avg_fatigue_7d'] = roll7(athlete_df['fatigue_level']).mean()
+        # Accumulated training load
+        athlete_df['cumulative_load_7d'] = short['training_load'].sum()
+        athlete_df['cumulative_load_14d'] = long['training_load'].sum()
 
-        # Rolling averages (past 14 days)
-        athlete_df['avg_intensity_14d'] = roll14(athlete_df['intensity_rpe']).mean()
-        athlete_df['avg_wellness_14d'] = roll14(athlete_df['wellness_score']).mean()
+        # Session counts — now genuinely "how many sessions in the last N days"
+        athlete_df['sessions_past_7d'] = short['session_id'].count()
+        athlete_df['sessions_past_14d'] = long['session_id'].count()
 
-        # Training load (intensity x duration)
-        athlete_df['training_load'] = athlete_df['intensity_rpe'] * athlete_df['duration_minutes']
-        athlete_df['cumulative_load_7d'] = roll7(athlete_df['training_load']).sum()
-        athlete_df['cumulative_load_14d'] = roll14(athlete_df['training_load']).sum()
-
-        # Session count features
-        athlete_df['sessions_past_7d'] = roll7(athlete_df['session_id']).count()
-        athlete_df['sessions_past_14d'] = roll14(athlete_df['session_id']).count()
-
-        # Recovery score (inverse of fatigue, combined with sleep)
-        athlete_df['recovery_score'] = (
-            (10 - athlete_df['fatigue_level']) * athlete_df['sleep_hours'] / 8
-        )
-        athlete_df['avg_recovery_7d'] = roll7(athlete_df['recovery_score']).mean()
-
-        features_list.append(athlete_df)
+        features_list.append(athlete_df.reset_index())
 
     # Combine all athletes
     features_df = pd.concat(features_list, ignore_index=True)

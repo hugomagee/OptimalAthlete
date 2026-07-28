@@ -1,6 +1,26 @@
 """
 Machine learning models for sprint performance prediction.
-Trains Random Forest and XGBoost models.
+
+Two evaluation protocols are computed and both are persisted, because the
+difference between them is the point:
+
+- **Walk-forward** (the reported protocol). Races are sorted by date; each race
+  is predicted by a model trained only on races that happened before it. This
+  is the only protocol that answers the question the system actually poses —
+  "given training data up to today, what will the next race time be?"
+
+- **Naive pooled split** (a cautionary comparison, not a result). A random
+  train/test split over pooled athletes, which is what this project originally
+  reported. It leaks in two directions at once: temporally, because future
+  races inform predictions of past ones, and by athlete identity, because the
+  same athlete appears on both sides of the split and most of the variance in
+  pooled race times is *between* athletes rather than within them. The analysis
+  notebook quantifies this; the number it produces is inflated and is labelled
+  as such everywhere it appears.
+
+A "predict the athlete's recent average" baseline is evaluated under the same
+walk-forward protocol, because a model that cannot beat that baseline has not
+demonstrated anything.
 """
 
 import json
@@ -162,6 +182,119 @@ def train_xgboost(
     return xgb_model, metrics
 
 
+def _score(y_true, y_pred, label: str, n_train_note: str = '') -> dict:
+    """Standard metric bundle for a set of out-of-sample predictions."""
+    y_true = np.asarray(y_true, dtype=float)
+    y_pred = np.asarray(y_pred, dtype=float)
+    out = {
+        'model_name': label,
+        'mae': float(mean_absolute_error(y_true, y_pred)),
+        'rmse': float(np.sqrt(mean_squared_error(y_true, y_pred))),
+        'n_predictions': int(len(y_true)),
+    }
+    # R^2 is undefined for a single point and unstable for very few; report it
+    # only where it can carry meaning, and let it go negative when it should.
+    out['r2'] = float(r2_score(y_true, y_pred)) if len(y_true) >= 3 else None
+    if n_train_note:
+        out['note'] = n_train_note
+    return out
+
+
+def make_random_forest() -> RandomForestRegressor:
+    return RandomForestRegressor(
+        n_estimators=100, max_depth=10, min_samples_split=2,
+        min_samples_leaf=1, random_state=42,
+    )
+
+
+def make_xgboost() -> xgb.XGBRegressor:
+    return xgb.XGBRegressor(
+        n_estimators=100, max_depth=6, learning_rate=0.1, random_state=42,
+    )
+
+
+def walk_forward_predict(
+    ml_dataset: pd.DataFrame,
+    feature_cols: list[str],
+    model_factory,
+    min_train: int = 10,
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Expanding-window walk-forward prediction over races in date order.
+
+    For each race i (from ``min_train`` onward) a fresh model is fitted on races
+    0..i-1 and used to predict race i. No future information reaches any
+    prediction.
+
+    Returns:
+        (y_true, y_pred) for the predicted races. Empty arrays if the dataset is
+        too small to leave any out-of-sample races.
+    """
+    ordered = ml_dataset.sort_values('race_date').reset_index(drop=True)
+    X = ordered[feature_cols]
+    y = ordered['race_time_seconds']
+
+    if len(ordered) <= min_train:
+        return np.array([]), np.array([])
+
+    y_true, y_pred = [], []
+    for i in range(min_train, len(ordered)):
+        model = model_factory()
+        model.fit(X.iloc[:i], y.iloc[:i])
+        y_pred.append(float(model.predict(X.iloc[[i]])[0]))
+        y_true.append(float(y.iloc[i]))
+
+    return np.array(y_true), np.array(y_pred)
+
+
+def walk_forward_baseline(
+    ml_dataset: pd.DataFrame,
+    min_train: int = 10,
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    "Predict the athlete's recent average" baseline, same walk-forward protocol.
+
+    For each race, predict the mean of that athlete's previous race times,
+    falling back to the mean over all previous races when the athlete has none.
+    A model that cannot beat this has not learned anything about form.
+    """
+    ordered = ml_dataset.sort_values('race_date').reset_index(drop=True)
+    if len(ordered) <= min_train:
+        return np.array([]), np.array([])
+
+    y_true, y_pred = [], []
+    for i in range(min_train, len(ordered)):
+        history = ordered.iloc[:i]
+        athlete_id = ordered.iloc[i]['athlete_id']
+        own = history[history['athlete_id'] == athlete_id]['race_time_seconds']
+        prediction = own.mean() if len(own) else history['race_time_seconds'].mean()
+        y_pred.append(float(prediction))
+        y_true.append(float(ordered.iloc[i]['race_time_seconds']))
+
+    return np.array(y_true), np.array(y_pred)
+
+
+def evaluate_walk_forward(ml_dataset: pd.DataFrame, feature_cols: list[str]) -> dict:
+    """Run every model plus the baseline under the walk-forward protocol."""
+    results = {}
+
+    for key, label, factory in [
+        ('random_forest', 'Random Forest', make_random_forest),
+        ('xgboost', 'XGBoost', make_xgboost),
+    ]:
+        y_true, y_pred = walk_forward_predict(ml_dataset, feature_cols, factory)
+        if len(y_true):
+            results[key] = _score(y_true, y_pred, label)
+
+    y_true, y_pred = walk_forward_baseline(ml_dataset)
+    if len(y_true):
+        results['baseline_recent_average'] = _score(
+            y_true, y_pred, 'Baseline: athlete recent average'
+        )
+
+    return results
+
+
 def display_feature_importance(model, feature_names: list[str], model_name: str) -> None:
     """
     Display feature importance from trained model.
@@ -242,38 +375,80 @@ def train_models() -> tuple[RandomForestRegressor, xgb.XGBRegressor, dict, dict]
     print(f"   Features: {len(feature_names)}")
     print(f"   Samples: {len(X)}")
 
-    # Split data
+    # ── Reported protocol: walk-forward ────────────────────────────────────
+    print("\nEvaluating with walk-forward validation (the reported protocol)...")
+    print("   Each race is predicted using only races that happened before it.")
+    walk_forward = evaluate_walk_forward(ml_dataset, feature_names)
+
+    if walk_forward:
+        for key, m in walk_forward.items():
+            r2 = f"{m['r2']:.3f}" if m['r2'] is not None else "n/a"
+            print(f"   {m['model_name']:<34} MAE {m['mae']:.3f}s  "
+                  f"RMSE {m['rmse']:.3f}s  R² {r2}  (n={m['n_predictions']})")
+    else:
+        print("   Not enough races for walk-forward evaluation.")
+
+    # ── Cautionary comparison: the leaky pooled split ──────────────────────
+    print("\nFor comparison only — naive pooled random split (LEAKY, not a result):")
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42
     )
     print(f"   Training samples: {len(X_train)}")
     print(f"   Test samples: {len(X_test)}")
 
-    # Train Random Forest
     rf_model, rf_metrics = train_random_forest(X_train, y_train, X_test, y_test)
     display_feature_importance(rf_model, feature_names, "Random Forest")
 
-    # Train XGBoost
     xgb_model, xgb_metrics = train_xgboost(X_train, y_train, X_test, y_test)
     display_feature_importance(xgb_model, feature_names, "XGBoost")
 
-    # Save models
-    save_models(
-        rf_model, xgb_model, feature_names,
-        metrics={'random_forest': rf_metrics, 'xgboost': xgb_metrics}
-    )
+    metrics = {
+        'reported_protocol': 'walk_forward',
+        'walk_forward': walk_forward,
+        'naive_pooled_split': {
+            'random_forest': rf_metrics,
+            'xgboost': xgb_metrics,
+            'warning': (
+                'Leaky protocol, retained only as a cautionary comparison. Pools '
+                'athletes and splits at random, so the same athlete appears on both '
+                'sides of the split and future races inform predictions of past ones. '
+                'Do not report these numbers as model performance.'
+            ),
+        },
+        'n_samples': int(len(X)),
+        'n_features': len(feature_names),
+        'feature_names': feature_names,
+    }
 
-    # Summary
-    print("\n" + "="*60)
-    print("MODEL TRAINING COMPLETE!")
-    print("="*60)
-    print(f"\nRandom Forest Test MAE: {rf_metrics['test_mae']:.3f} seconds")
-    print(f"XGBoost Test MAE: {xgb_metrics['test_mae']:.3f} seconds")
+    save_models(rf_model, xgb_model, feature_names, metrics=metrics)
 
-    if xgb_metrics['test_mae'] < rf_metrics['test_mae']:
-        print(f"\nBest model: XGBoost (MAE: {xgb_metrics['test_mae']:.3f}s)")
-    else:
-        print(f"\nBest model: Random Forest (MAE: {rf_metrics['test_mae']:.3f}s)")
+    # ── Summary ────────────────────────────────────────────────────────────
+    print("\n" + "=" * 60)
+    print("MODEL TRAINING COMPLETE")
+    print("=" * 60)
+
+    if walk_forward:
+        best_key = min(
+            (k for k in walk_forward if k != 'baseline_recent_average'),
+            key=lambda k: walk_forward[k]['mae'],
+            default=None,
+        )
+        baseline = walk_forward.get('baseline_recent_average')
+        if best_key:
+            best = walk_forward[best_key]
+            print(f"\nBest model under walk-forward: {best['model_name']} "
+                  f"(MAE {best['mae']:.3f}s over {best['n_predictions']} races)")
+            if baseline:
+                print(f"Recent-average baseline:       MAE {baseline['mae']:.3f}s")
+                if best['mae'] < baseline['mae']:
+                    print("The model beats the baseline on this data.")
+                else:
+                    print("The model does NOT beat the baseline on this data — "
+                          "it has not demonstrated predictive value.")
+
+    print(f"\nNaive pooled split, for contrast: "
+          f"RF test MAE {rf_metrics['test_mae']:.3f}s, "
+          f"R² {rf_metrics['test_r2']:.3f} (leaky — not a result)")
 
     return rf_model, xgb_model, rf_metrics, xgb_metrics
 
