@@ -146,5 +146,11 @@ standardized Ridge with a pairs bootstrap gives that in race-time units, with CI
 
 ## What the CV can now say
 
-See notebook §10 for the quotable sentence. Anything citing "R²=0.84" or "2.3×" should be
-removed; the defensible replacement is the audited negative result plus the methodology.
+See notebook §10 for the quotable sentence, and [CV_CLAIMS.md](CV_CLAIMS.md) for the exact
+bullets this repository supports verbatim, each with a pointer to the code that proves it.
+
+Anything citing "R²=0.84" or "2.3×" should be removed; the defensible replacement is the
+audited negative result plus the methodology. Since this document was first written, the
+pipeline itself has been rebuilt around walk-forward validation, so the contradiction it
+described — an audit that demolished the pooled split sitting beside a `models.py` that
+used one — no longer exists. See the README changelog.
