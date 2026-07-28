@@ -25,6 +25,15 @@ jobs:
       - name: Run tests
         run: pytest
 
+      - name: Verify the pipeline is deterministic
+        run: |
+          python data_loader.py
+          python models.py
+          cp models/model_metrics.json /tmp/metrics_first.json
+          python data_loader.py
+          python models.py
+          diff /tmp/metrics_first.json models/model_metrics.json
+
       - name: Execute analysis notebook on synthetic data
         env:
           USE_SYNTHETIC: "1"
