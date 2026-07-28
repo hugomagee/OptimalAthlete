@@ -1,6 +1,9 @@
 """
-Streamlit dashboard for OptimalAthlete sprint performance system.
-Interactive interface for data visualization and predictions.
+Streamlit dashboard for OptimalAthlete.
+
+Presents the walk-forward evaluation as the headline result and shows the
+naive pooled split beside it, struck through, as the leakage cautionary tale.
+Visual styling lives in theme.py.
 """
 
 import json
@@ -11,80 +14,18 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
+import theme
 from database import get_db
 from setup_db import Athlete, PerformanceMetric, RaceResult, TrainingSession
 
-# Page configuration
 st.set_page_config(
-    page_title="OptimalAthlete Dashboard",
+    page_title="OptimalAthlete",
     page_icon=None,
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded",
 )
 
-# Custom CSS
-st.markdown("""
-<style>
-    /* Main background and font */
-    .main { background-color: #0e1117; }
-
-    /* Header styling */
-    h1 { color: #f0f2f6; font-weight: 700; letter-spacing: -0.5px; }
-    h2, h3 { color: #c9d1d9; }
-
-    /* Metric cards */
-    [data-testid="metric-container"] {
-        background: linear-gradient(135deg, #1c1f26, #252930);
-        border: 1px solid #2d3139;
-        border-radius: 12px;
-        padding: 16px 20px;
-    }
-    [data-testid="metric-container"] label {
-        color: #8b949e !important;
-        font-size: 0.78rem;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-    }
-    [data-testid="metric-container"] [data-testid="metric-value"] {
-        color: #58a6ff !important;
-        font-size: 1.8rem;
-        font-weight: 700;
-    }
-
-    /* Tab styling */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-        border-bottom: 1px solid #30363d;
-    }
-    .stTabs [data-baseweb="tab"] {
-        background: transparent;
-        border: 1px solid #30363d;
-        border-radius: 8px 8px 0 0;
-        color: #8b949e;
-        padding: 8px 20px;
-        font-weight: 500;
-    }
-    .stTabs [aria-selected="true"] {
-        background: #1c1f26 !important;
-        border-color: #58a6ff !important;
-        color: #58a6ff !important;
-    }
-
-    /* Sidebar */
-    [data-testid="stSidebar"] {
-        background: #161b22;
-        border-right: 1px solid #30363d;
-    }
-
-    /* Dataframe */
-    [data-testid="stDataFrame"] { border-radius: 10px; overflow: hidden; }
-
-    /* Divider */
-    hr { border-color: #30363d; }
-
-    /* Footer */
-    .footer-text { color: #8b949e; font-size: 0.82rem; text-align: center; }
-</style>
-""", unsafe_allow_html=True)
+st.markdown(theme.CSS, unsafe_allow_html=True)
 
 
 @st.cache_resource
@@ -187,292 +128,325 @@ def load_model_metrics():
         return None
 
 
+def render_protocol_comparison(metrics: dict) -> None:
+    """Walk-forward as the headline; the pooled split struck through beside it."""
+    walk = (metrics or {}).get("walk_forward") or {}
+    naive = (metrics or {}).get("naive_pooled_split") or {}
+
+    if not walk:
+        st.info(
+            "No walk-forward metrics saved yet. Run `python models.py` to generate them."
+        )
+        return
+
+    st.markdown("### Reported protocol — walk-forward validation")
+    st.markdown(
+        '<div class="note">Races are sorted by date and each one is predicted by a '
+        'model fitted <strong>only on races that happened before it</strong>. This is '
+        'the only protocol that answers the question the system poses: given training '
+        'data up to today, what will the next race time be?</div>',
+        unsafe_allow_html=True,
+    )
+
+    rows = []
+    for key in ("random_forest", "xgboost", "baseline_recent_average"):
+        m = walk.get(key)
+        if not m:
+            continue
+        rows.append({
+            "Model": m["model_name"],
+            "MAE (s)": round(m["mae"], 3),
+            "RMSE (s)": round(m["rmse"], 3),
+            "R²": round(m["r2"], 3) if m.get("r2") is not None else None,
+            "Races predicted": m["n_predictions"],
+        })
+    if rows:
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+    baseline = walk.get("baseline_recent_average")
+    models = {k: v for k, v in walk.items() if k != "baseline_recent_average"}
+    if baseline and models:
+        best_key = min(models, key=lambda k: models[k]["mae"])
+        best = models[best_key]
+        if best["mae"] < baseline["mae"]:
+            verdict = (
+                f"<strong>The best model beats the baseline.</strong> "
+                f"{best['model_name']} reaches MAE {best['mae']:.3f}s against the "
+                f"baseline's {baseline['mae']:.3f}s."
+            )
+        else:
+            verdict = (
+                f"<strong>No model beats the baseline.</strong> The best model "
+                f"({best['model_name']}, MAE {best['mae']:.3f}s) is worse than simply "
+                f"predicting each athlete's recent average ({baseline['mae']:.3f}s). "
+                f"On this data the models have not demonstrated predictive value — "
+                f"which is the correct answer, because the bundled demo data contains "
+                f"no relationship between training features and race time by construction."
+            )
+        st.markdown(f'<div class="note">{verdict}</div>', unsafe_allow_html=True)
+
+    st.markdown("### Cautionary comparison — naive pooled split")
+    st.markdown(
+        '<div class="note">These are the numbers this project used to report, and they '
+        'are <strong>not a result</strong>. A random train/test split over pooled '
+        'athletes leaks in two directions: future races inform predictions of past '
+        'ones, and the same athlete appears on both sides of the split — and most of '
+        'the variance in pooled race times is <em>between</em> athletes rather than '
+        'within them. The R² below is what that leakage buys you on data with no real '
+        'signal in it.</div>',
+        unsafe_allow_html=True,
+    )
+
+    for key in ("random_forest", "xgboost"):
+        m = naive.get(key)
+        if not m:
+            continue
+        st.markdown(
+            f'<div class="row"><span class="row-key">{m["model_name"]} '
+            f'— pooled-split test R²</span>'
+            f'<span class="row-val retracted">{m["test_r2"]:.3f}</span></div>',
+            unsafe_allow_html=True,
+        )
+    st.markdown(
+        '<div class="note">An earlier version of this project claimed R² = 0.84 on '
+        'personal training data. The pooled split reproduces a figure of that '
+        'magnitude on synthetic data built to contain no signal whatsoever — which is '
+        'the clearest possible demonstration that the original number measured the '
+        'protocol, not the athlete.</div>',
+        unsafe_allow_html=True,
+    )
+
+
+# ── sections ──────────────────────────────────────────────────────────────
+
+def render_overview(athlete_sessions: pd.DataFrame, athlete_races: pd.DataFrame) -> None:
+    st.markdown("## Key figures")
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Sessions", f"{len(athlete_sessions):,}")
+    col2.metric("Races", f"{len(athlete_races):,}")
+    col3.metric("Avg intensity", f"{athlete_sessions['intensity'].mean():.1f}")
+    if len(athlete_races):
+        col4.metric("Best 400m", f"{athlete_races['time'].min():.2f}s")
+
+    st.markdown("## Training volume")
+    st.markdown(
+        '<p class="lede">Total session minutes per week</p>', unsafe_allow_html=True
+    )
+    sessions = athlete_sessions.copy()
+    sessions['date'] = pd.to_datetime(sessions['date'])
+    weekly = (
+        sessions.groupby(pd.Grouper(key='date', freq='W'))['duration']
+        .sum().reset_index()
+    )
+    fig = px.line(weekly, x='date', y='duration')
+    fig.update_traces(
+        line=dict(color=theme.SERIES[0], width=2),
+        hovertemplate='%{x|%d %b %Y}<br>%{y:,.0f} min<extra></extra>',
+    )
+    theme.style_figure(fig, y_title='minutes per week', height=300)
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def render_training(athlete_sessions: pd.DataFrame) -> None:
+    st.markdown("## Session mix")
+    st.markdown(
+        '<p class="lede">Count of sessions by type</p>', unsafe_allow_html=True
+    )
+    counts = athlete_sessions['session_type'].value_counts().sort_values()
+    fig = px.bar(x=counts.values, y=counts.index, orientation='h')
+    fig.update_traces(
+        marker_color=theme.SERIES[0],
+        hovertemplate='%{y}<br>%{x} sessions<extra></extra>',
+    )
+    theme.style_figure(fig, x_title='sessions', height=280)
+    fig.update_xaxes(showgrid=True, gridcolor=theme.GRID)
+    fig.update_yaxes(showgrid=False)
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.markdown("## Session intensity")
+    st.markdown(
+        '<p class="lede">Distribution of rate-of-perceived-exertion scores</p>',
+        unsafe_allow_html=True,
+    )
+    fig = px.histogram(athlete_sessions, x='intensity', nbins=24)
+    fig.update_traces(
+        marker_color=theme.SERIES[0],
+        hovertemplate='RPE %{x}<br>%{y} sessions<extra></extra>',
+    )
+    theme.style_figure(fig, x_title='RPE (1–10)', y_title='sessions', height=280)
+    fig.update_layout(bargap=0.08)
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.markdown("## Recent sessions")
+    recent = athlete_sessions.sort_values('date', ascending=False).head(12)
+    table = pd.DataFrame({
+        'Date': pd.to_datetime(recent['date']).dt.strftime('%Y-%m-%d'),
+        'Type': recent['session_type'],
+        'Minutes': recent['duration'],
+        'RPE': recent['intensity'].round(1),
+    })
+    st.dataframe(table, use_container_width=True, hide_index=True)
+
+
+def render_races(athlete_races: pd.DataFrame, athlete_info) -> None:
+    if len(athlete_races) == 0:
+        st.info("No race results available for this athlete.")
+        return
+
+    st.markdown("## Race times")
+    st.markdown(
+        '<p class="lede">400m times over the recorded period. '
+        'The axis is inverted so that faster is higher.</p>',
+        unsafe_allow_html=True,
+    )
+    races = athlete_races.copy()
+    races['date'] = pd.to_datetime(races['date'])
+    ordered = races.sort_values('date')
+
+    fig = px.line(ordered, x='date', y='time', markers=True)
+    fig.update_traces(
+        line=dict(color=theme.SERIES[0], width=2),
+        marker=dict(size=7, line=dict(width=2, color=theme.SURFACE)),
+        hovertemplate='%{x|%d %b %Y}<br>%{y:.2f}s<extra></extra>',
+    )
+    fig.add_hline(
+        y=athlete_info['pb_400m'],
+        line_dash="dot", line_color=theme.MUTED, line_width=1,
+        annotation_text="personal best", annotation_position="top left",
+        annotation_font=dict(size=11, color=theme.MUTED),
+    )
+    theme.style_figure(fig, y_title='seconds', reverse_y=True, height=320)
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.markdown("## All races")
+    table = pd.DataFrame({
+        'Date': ordered['date'].dt.strftime('%Y-%m-%d'),
+        'Time (s)': ordered['time'].round(2),
+        'Location': ordered['location'],
+    })
+    st.dataframe(table, use_container_width=True, hide_index=True)
+
+
+def render_models(rf_model, feature_names) -> None:
+    st.markdown("## How these models are evaluated")
+    metrics = load_model_metrics()
+    render_protocol_comparison(metrics)
+
+    if rf_model is None or not feature_names:
+        st.error("Models not loaded. Run `python models.py` first.")
+        return
+
+    st.markdown("## Feature importance")
+    st.markdown(
+        '<p class="lede">Random Forest impurity importance. Importance describes what '
+        'the model leaned on, not what causes race times — on data with no true signal '
+        'it reflects noise.</p>',
+        unsafe_allow_html=True,
+    )
+    importance = pd.DataFrame({
+        'Feature': feature_names,
+        'Importance': rf_model.feature_importances_,
+    }).sort_values('Importance').tail(8)
+
+    fig = px.bar(importance, x='Importance', y='Feature', orientation='h')
+    fig.update_traces(
+        marker_color=theme.SERIES[0],
+        hovertemplate='%{y}<br>%{x:.3f}<extra></extra>',
+    )
+    theme.style_figure(fig, x_title='importance', height=300)
+    fig.update_xaxes(showgrid=True, gridcolor=theme.GRID)
+    fig.update_yaxes(showgrid=False)
+    st.plotly_chart(fig, use_container_width=True)
+
+    if metrics:
+        st.markdown(
+            f'<div class="note"><strong>Dataset.</strong> '
+            f'{metrics.get("n_samples", "?")} races, '
+            f'{metrics.get("n_features", len(feature_names))} engineered features. '
+            f'Rolling features use genuine calendar windows (7 and 14 days), not row '
+            f'counts.</div>',
+            unsafe_allow_html=True,
+        )
+
+
+# Sections in tab order. The keys double as the values accepted by
+# OA_ONLY_SECTION, which tools/capture_screenshots.py sets so each screenshot in
+# docs/screenshots/ can be regenerated from the live app one section at a time.
+SECTIONS = ("overview", "training", "races", "models")
+SECTION_LABELS = {
+    "overview": "Overview",
+    "training": "Training analysis",
+    "races": "Race results",
+    "models": "Model evaluation",
+}
+
+
 def main():
     """Main dashboard function."""
+    st.markdown("# OptimalAthlete")
+    st.markdown(
+        '<p class="lede">An n=1 training-data measurement methodology · '
+        'CI-tested · ready for real wearable data</p>'
+        '<span class="kicker">Synthetic demo data — no signal by construction</span>',
+        unsafe_allow_html=True,
+    )
 
-    # Header
-    st.markdown("""
-    <div style="display:flex; align-items:center; gap:14px; margin-bottom:6px;">
-        <div>
-            <h1 style="margin:0; padding:0; font-size:2rem;">OptimalAthlete</h1>
-            <p style="margin:0; color:#8b949e; font-size:0.95rem; letter-spacing:0.04em;">
-                ML-POWERED SPRINT PERFORMANCE ANALYSIS
-            </p>
-        </div>
-    </div>
-    <hr style="margin-top:8px; margin-bottom:20px;">
-    """, unsafe_allow_html=True)
-
-    # Bootstrap database and models on first run, then load data
     ensure_data_and_models()
     athletes_df, sessions_df, metrics_df, races_df = load_data()
     rf_model, xgb_model, feature_names = load_models()
 
-    # Sidebar - Athlete Selection
-    st.sidebar.markdown("## Dashboard Controls")
+    st.sidebar.markdown("## Controls")
     selected_athlete_id = st.sidebar.selectbox(
-        "Select Athlete",
+        "Athlete",
         athletes_df['id'].tolist(),
-        format_func=lambda x: athletes_df[athletes_df['id']==x]['name'].values[0]
+        format_func=lambda x: athletes_df[athletes_df['id'] == x]['name'].values[0],
+    )
+    athlete_info = athletes_df[athletes_df['id'] == selected_athlete_id].iloc[0]
+
+    st.sidebar.markdown("## Profile")
+    st.sidebar.markdown(
+        f'<div class="row"><span class="row-key">Name</span>'
+        f'<span class="row-val">{athlete_info["name"]}</span></div>'
+        f'<div class="row"><span class="row-key">Gender</span>'
+        f'<span class="row-val">{athlete_info["gender"]}</span></div>'
+        f'<div class="row"><span class="row-key">400m PB</span>'
+        f'<span class="row-val">{athlete_info["pb_400m"]:.2f}s</span></div>',
+        unsafe_allow_html=True,
     )
 
-    athlete_info = athletes_df[athletes_df['id']==selected_athlete_id].iloc[0]
+    athlete_sessions = sessions_df[
+        sessions_df['athlete_id'] == selected_athlete_id
+    ].copy()
+    athlete_races = races_df[races_df['athlete_id'] == selected_athlete_id].copy()
 
-    # Sidebar - Athlete Info
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("### Athlete Profile")
-    st.sidebar.write(f"**Name:** {athlete_info['name']}")
-    st.sidebar.write(f"**Gender:** {athlete_info['gender']}")
-    st.sidebar.write(f"**400m PB:** {athlete_info['pb_400m']:.2f}s")
+    # Docs mode: render one section without the tab chrome so each screenshot
+    # can be captured at full height.
+    only = os.environ.get("OA_ONLY_SECTION")
+    if only in SECTIONS:
+        {
+            "overview": lambda: render_overview(athlete_sessions, athlete_races),
+            "training": lambda: render_training(athlete_sessions),
+            "races": lambda: render_races(athlete_races, athlete_info),
+            "models": lambda: render_models(rf_model, feature_names),
+        }[only]()
+    else:
+        tabs = st.tabs([SECTION_LABELS[s] for s in SECTIONS])
+        with tabs[0]:
+            render_overview(athlete_sessions, athlete_races)
+        with tabs[1]:
+            render_training(athlete_sessions)
+        with tabs[2]:
+            render_races(athlete_races, athlete_info)
+        with tabs[3]:
+            render_models(rf_model, feature_names)
 
-    # Filter data for selected athlete
-    athlete_sessions = sessions_df[sessions_df['athlete_id']==selected_athlete_id].copy()
-    athlete_races = races_df[races_df['athlete_id']==selected_athlete_id].copy()
-
-    # Main content tabs
-    tab1, tab2, tab3, tab4 = st.tabs([
-        "Overview",
-        "Training Analysis",
-        "Race Results",
-        "ML Predictions"
-    ])
-
-    # TAB 1: Overview
-    with tab1:
-        st.header("Performance Overview")
-
-        col1, col2, col3, col4 = st.columns(4)
-
-        with col1:
-            st.metric(
-                "Total Sessions",
-                len(athlete_sessions),
-                delta=None
-            )
-
-        with col2:
-            st.metric(
-                "Total Races",
-                len(athlete_races),
-                delta=None
-            )
-
-        with col3:
-            avg_intensity = athlete_sessions['intensity'].mean()
-            st.metric(
-                "Avg Intensity",
-                f"{avg_intensity:.1f}/10",
-                delta=None
-            )
-
-        with col4:
-            if len(athlete_races) > 0:
-                best_time = athlete_races['time'].min()
-                st.metric(
-                    "Best Race Time",
-                    f"{best_time:.2f}s",
-                    delta=None
-                )
-
-        # Training volume over time
-        st.subheader("Training Volume Over Time")
-        athlete_sessions['date'] = pd.to_datetime(athlete_sessions['date'])
-        weekly_volume = athlete_sessions.groupby(
-            pd.Grouper(key='date', freq='W')
-        )['duration'].sum().reset_index()
-
-        fig_volume = px.line(
-            weekly_volume,
-            x='date',
-            y='duration',
-            title='Weekly Training Volume (minutes)',
-            labels={'duration': 'Minutes', 'date': 'Date'},
-            color_discrete_sequence=['#58a6ff'],
-            template='plotly_dark'
-        )
-        fig_volume.update_layout(
-            plot_bgcolor='#1c1f26',
-            paper_bgcolor='#1c1f26',
-            font_color='#c9d1d9',
-            title_font_size=15,
-        )
-        fig_volume.update_traces(line_width=2.5)
-        st.plotly_chart(fig_volume, use_container_width=True)
-
-    # TAB 2: Training Analysis
-    with tab2:
-        st.header("Training Analysis")
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            # Session type distribution
-            session_counts = athlete_sessions['session_type'].value_counts()
-            fig_pie = px.pie(
-                values=session_counts.values,
-                names=session_counts.index,
-                title='Training Session Distribution',
-                color_discrete_sequence=['#58a6ff', '#3fb950', '#f78166', '#d2a8ff', '#ffa657'],
-                template='plotly_dark'
-            )
-            fig_pie.update_layout(
-                plot_bgcolor='#1c1f26',
-                paper_bgcolor='#1c1f26',
-                font_color='#c9d1d9',
-                title_font_size=15,
-            )
-            st.plotly_chart(fig_pie, use_container_width=True)
-
-        with col2:
-            # Intensity distribution
-            fig_intensity = px.histogram(
-                athlete_sessions,
-                x='intensity',
-                nbins=10,
-                title='Training Intensity Distribution',
-                labels={'intensity': 'RPE Score (1-10)'},
-                color_discrete_sequence=['#3fb950'],
-                template='plotly_dark'
-            )
-            fig_intensity.update_layout(
-                plot_bgcolor='#1c1f26',
-                paper_bgcolor='#1c1f26',
-                font_color='#c9d1d9',
-                title_font_size=15,
-                bargap=0.1,
-            )
-            st.plotly_chart(fig_intensity, use_container_width=True)
-
-        # Recent sessions table
-        st.subheader("Recent Training Sessions")
-        recent_sessions = athlete_sessions.sort_values('date', ascending=False).head(10)
-        st.dataframe(
-            recent_sessions[['date', 'session_type', 'duration', 'intensity']],
-            use_container_width=True,
-            hide_index=True
-        )
-
-    # TAB 3: Race Results
-    with tab3:
-        st.header("Race Performance")
-
-        if len(athlete_races) > 0:
-            athlete_races['date'] = pd.to_datetime(athlete_races['date'])
-            athlete_races_sorted = athlete_races.sort_values('date')
-
-            # Race times over time
-            fig_races = px.line(
-                athlete_races_sorted,
-                x='date',
-                y='time',
-                title='Race Performance Over Time',
-                labels={'time': '400m Time (seconds)', 'date': 'Date'},
-                markers=True,
-                color_discrete_sequence=['#58a6ff'],
-                template='plotly_dark'
-            )
-            fig_races.update_traces(
-                line_width=2.5,
-                marker=dict(size=8, symbol='circle', line=dict(width=2, color='#1c1f26'))
-            )
-            fig_races.add_hline(
-                y=athlete_info['pb_400m'],
-                line_dash="dash",
-                line_color="#f78166",
-                annotation_text="Personal Best",
-                annotation_font_color="#f78166"
-            )
-            fig_races.update_layout(
-                plot_bgcolor='#1c1f26',
-                paper_bgcolor='#1c1f26',
-                font_color='#c9d1d9',
-                title_font_size=15,
-                yaxis=dict(autorange='reversed'),
-            )
-            st.plotly_chart(fig_races, use_container_width=True)
-
-            # Race results table
-            st.subheader("All Race Results")
-            st.dataframe(
-                athlete_races_sorted[['date', 'time', 'location']],
-                use_container_width=True,
-                hide_index=True
-            )
-        else:
-            st.info("No race results available for this athlete.")
-
-    # TAB 4: ML Predictions
-    with tab4:
-        st.header("Machine Learning Predictions")
-
-        if rf_model is not None:
-            st.subheader("Model Performance")
-
-            metrics = load_model_metrics()
-            col1, col2 = st.columns(2)
-
-            with col1:
-                st.markdown("**Random Forest Model**")
-                if metrics:
-                    rf = metrics['random_forest']
-                    st.write(f"- Test MAE: {rf['test_mae']:.2f} seconds")
-                    st.write(f"- Test R²: {rf['test_r2']:.2f}")
-                else:
-                    st.write("- Metrics unavailable (retrain with `python models.py`)")
-                st.write(f"- Uses {len(feature_names)} training features")
-
-            with col2:
-                st.markdown("**XGBoost Model**")
-                if metrics:
-                    xg = metrics['xgboost']
-                    st.write(f"- Test MAE: {xg['test_mae']:.2f} seconds")
-                    st.write(f"- Test R²: {xg['test_r2']:.2f}")
-                else:
-                    st.write("- Metrics unavailable (retrain with `python models.py`)")
-                st.write("- Gradient boosting approach")
-
-            st.markdown("---")
-            st.subheader("Race Time Prediction")
-            st.info(
-                "Note: Predictions are based on recent training data. "
-                "With limited race samples in demo dataset, predictions are approximate. "
-                "A real system with 100+ races would be more accurate."
-            )
-
-            # Feature importance
-            st.subheader("Most Important Features")
-            feature_importance = pd.DataFrame({
-                'Feature': feature_names,
-                'Importance': rf_model.feature_importances_
-            }).sort_values('Importance', ascending=False).head(5)
-
-            fig_importance = px.bar(
-                feature_importance,
-                x='Importance',
-                y='Feature',
-                orientation='h',
-                title='Top 5 Features for Prediction',
-                color_discrete_sequence=['#d2a8ff'],
-                template='plotly_dark'
-            )
-            fig_importance.update_layout(
-                plot_bgcolor='#1c1f26',
-                paper_bgcolor='#1c1f26',
-                font_color='#c9d1d9',
-                title_font_size=15,
-            )
-            st.plotly_chart(fig_importance, use_container_width=True)
-
-        else:
-            st.error("Models not loaded. Please train models first by running: `python models.py`")
-
-    # Footer
-    st.markdown("---")
     st.markdown(
-        '<p class="footer-text"><strong>OptimalAthlete</strong> &nbsp;·&nbsp; '
-        'ML Sprint Performance System &nbsp;·&nbsp; '
-        'Built for MSc Data Analytics Application</p>',
-        unsafe_allow_html=True
+        '<div class="footer"><strong>OptimalAthlete</strong> — an n=1 measurement '
+        'methodology for training and race data. All figures on this page are computed '
+        'from the bundled synthetic database, which is generated from a fixed seed and '
+        'contains no relationship between training features and race outcomes. '
+        'Nothing here is a performance claim.</div>',
+        unsafe_allow_html=True,
     )
 
 
