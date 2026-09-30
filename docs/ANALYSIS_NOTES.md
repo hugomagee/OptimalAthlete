@@ -1,12 +1,12 @@
-# Analysis notes — recovery vs volume
+# Analysis notes: recovery vs volume
 
-Defense document for [`analysis/recovery_vs_volume.ipynb`](../analysis/recovery_vs_volume.ipynb).
-Every methodological choice, the alternatives considered, and the hard questions an
-interviewer should ask — with pointers to where the notebook answers them.
+Notes on [`analysis/recovery_vs_volume.ipynb`](../analysis/recovery_vs_volume.ipynb): every
+methodology choice, the alternatives I considered, and the hard questions a reviewer should
+ask, with pointers to where the notebook answers them.
 
 ## The short version
 
-The analysis set out to verify two CV claims — "R²=0.84" and "recovery quality was 2.3×
+The analysis set out to verify two earlier claims — "R²=0.84" and "recovery quality was 2.3×
 more predictive of performance than training volume" — and instead found that (a) the
 recovery/volume variables in the database are synthetic-generator output, (b) the R²
 figure was an artifact of athlete-identity and temporal leakage, and (c) under honest
@@ -89,7 +89,7 @@ Importance rankings don't answer "what is 1 SD of better recovery worth?". A des
 standardized Ridge with a pairs bootstrap gives that in race-time units, with CIs that
 (honestly) span zero.
 
-## The 10 hard interview questions
+## Ten hard questions about this analysis
 
 1. **"Your predictors turned out to be synthetic. Why publish the analysis at all?"**
    Because the audit *is* the result: I claimed a number, went to verify it, and found the
@@ -143,14 +143,3 @@ standardized Ridge with a pairs bootstrap gives that in race-time units, with CI
     Because the deliverable is the measurement system, not the current score. §4 reports
     the naive baseline next to the model precisely so future improvements are judged
     against the right bar.
-
-## What the CV can now say
-
-See notebook §10 for the quotable sentence, and [CV_CLAIMS.md](CV_CLAIMS.md) for the exact
-bullets this repository supports verbatim, each with a pointer to the code that proves it.
-
-Anything citing "R²=0.84" or "2.3×" should be removed; the defensible replacement is the
-audited negative result plus the methodology. Since this document was first written, the
-pipeline itself has been rebuilt around walk-forward validation, so the contradiction it
-described — an audit that demolished the pooled split sitting beside a `models.py` that
-used one — no longer exists. See the README changelog.
