@@ -85,6 +85,6 @@ It does not recommend training. The data here gives no evidence for prescribing 
 
 ## Author
 
-Hugo Magee · MSc Business Analytics and Data Science, IE University · 400m sprinter for Ireland · [LinkedIn](https://linkedin.com/in/hugo-magee-ooo) · hugomagee2002@gmail.com
+Hugo Magee · MSc Business Analytics and Data Science, IE University · 400m sprinter for Ireland · [LinkedIn](https://linkedin.com/in/hugo-magee-ooo)
 
 MIT licence
